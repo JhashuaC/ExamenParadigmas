@@ -1,0 +1,11 @@
+variable,estado
+col1,FALLA - Media fuera del rango
+col1,OK - Sin outliers
+col2,FALLA - Media fuera del rango
+col2,OK - Sin outliers
+col3,OK - Media dentro del rango
+col3,FALLA - Existen 5 outliers
+col4,FALLA - Media fuera del rango
+col4,OK - Sin outliers
+col5,FALLA - Media fuera del rango
+col5,OK - Sin outliers

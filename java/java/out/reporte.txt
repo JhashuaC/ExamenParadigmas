@@ -1,0 +1,20 @@
+Variable: col1
+  - FALLA - Media fuera del rango
+  - OK - Sin outliers
+
+Variable: col2
+  - FALLA - Media fuera del rango
+  - OK - Sin outliers
+
+Variable: col3
+  - OK - Media dentro del rango
+  - FALLA - Existen 5 outliers
+
+Variable: col4
+  - FALLA - Media fuera del rango
+  - OK - Sin outliers
+
+Variable: col5
+  - FALLA - Media fuera del rango
+  - OK - Sin outliers
+
