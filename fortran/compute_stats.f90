@@ -1,185 +1,224 @@
 ! compute_stats.f90
-! Programa que lee input.csv, calcula mean, median, stddev (muestra) y outliers (|z| >= 3)
-! Genera stats.csv y errors.log
+! Lee input.csv (cabecera + M filas x K columnas), calcula mean, median, stddev (muestral) y outliers (|z| >= 3)
 program compute_stats
   implicit none
 
-  ! variables
-  character(len=256) :: infile, outfile, elog
-  integer :: M, K, ios
+  character(len=256) :: infile = 'input.csv'
+  character(len=256) :: outfile = 'stats.csv'
+  character(len=256) :: elog = 'errors.log'
+  integer :: ios, M, K
   real, allocatable :: data(:,:)
   real, allocatable :: means(:), medians(:), stddevs(:)
   integer, allocatable :: outliers(:)
 
-  ! default filenames
-  infile = 'input.csv'
-  outfile = 'stats.csv'
-  elog = 'errors.log'
+  if (command_argument_count() >= 1) call get_command_argument(1, infile)
+  if (command_argument_count() >= 2) call get_command_argument(2, outfile)
 
-  ! remove previous errors.log if exists (attempt)
-  open(unit=99, file=elog, status='replace', action='write', iostat=ios)
-  if (ios /= 0) then
-     write(*,*) 'Warning: Could not create errors.log (iostat=', ios, ')'
+  ! create (or replace) error log
+  open(newunit=ios, file=elog, status='replace', action='write', iostat=ios)
+  if (ios == 0) then
+     write(ios,'(A)') 'Log start'
+     write(ios,'(A)') '-------------'
+     close(ios)
+  else
+     write(*,*) 'Warning: could not create ', trim(elog)
   end if
-  close(99)
 
-  ! Read CSV and get data in array (missing or non-numeric lines are skipped per value)
-  call read_csv(infile, data, M, K, elog)
+  call read_csv_two_pass(infile, data, M, K, elog)
 
   if (.not. allocated(data)) then
-     write(*,*) 'No data loaded. Check errors.log.'
+     write(*,*) 'No data loaded. Check ', trim(elog)
      stop 1
   end if
 
-  ! allocate result arrays
   allocate(means(K), medians(K), stddevs(K), outliers(K))
-  means = 0.0
-  medians = 0.0
-  stddevs = 0.0
-  outliers = 0
-
-  ! compute stats
   call compute_stats_array(data, M, K, means, medians, stddevs, outliers)
-
-  ! write stats.csv
   call write_stats_csv(outfile, K, means, medians, stddevs, outliers)
 
-  ! deallocate
-  deallocate(data)
-  deallocate(means, medians, stddevs, outliers)
+  ! cleanup
+  if (allocated(data)) deallocate(data)
+  if (allocated(means)) deallocate(means)
+  if (allocated(medians)) deallocate(medians)
+  if (allocated(stddevs)) deallocate(stddevs)
+  if (allocated(outliers)) deallocate(outliers)
 
-  write(*,*) 'Done. Output written to ', trim(outfile)
-  write(*,*) 'Errors logged to ', trim(elog)
+  write(*,*) 'Done. Output -> ', trim(outfile), '   (errors -> ', trim(elog), ')'
+
 contains
 
-  subroutine read_csv(filename, data, M, K, elog)
+  subroutine read_csv_two_pass(filename, data, M, K, elog)
     implicit none
     character(len=*), intent(in) :: filename
     real, allocatable, intent(out) :: data(:,:)
     integer, intent(out) :: M, K
     character(len=*), intent(in) :: elog
 
-    integer :: unit_in, ios, i, j, stat
-    character(len=1000) :: line
-    integer, parameter :: maxcols = 1000
-    character(len=:), allocatable :: header
-    integer :: ncols
-    real, allocatable :: coltemp(:)
-    real, allocatable :: tmpdata(:,:)
-    integer :: maxrows
-    character(len=1000) :: token
-    integer :: pos, start, comma_pos
-    logical :: firstline
-    integer :: rowcount
-    character(len=256) :: errmsg
-    integer :: rstat
+    integer :: unit_in, ios, iostat2, rowcount, i, j
+    character(len=1000) :: line, header
+    integer :: lenline, start, comma_pos
+    character(len=256) :: token
     real :: val
-    integer :: istrlen
+    integer :: logu
+    real, parameter :: missing_sentinel = huge(1.0)
 
-    ! initialization
+    ! defaults
     M = 0; K = 0
-    allocate(data(0,0)) ; ! will be replaced
-    maxrows = 1000000    ! límite razonable (puedes cambiar si necesitas más)
-    rowcount = 0
-    firstline = .true.
+    if (allocated(data)) deallocate(data)
+    allocate(data(0,0))
 
+    ! open file
     open(newunit=unit_in, file=filename, status='old', action='read', iostat=ios)
     if (ios /= 0) then
-       open(unit=99, file=elog, status='old', action='write', position='append')
-       write(99, '(A)') 'ERROR: Could not open input file: '//trim(filename)
-       close(99)
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=iostat2)
+       if (iostat2 == 0) then
+          write(logu,'(A)') 'ERROR: Could not open input file: '//trim(filename)
+          close(logu)
+       end if
        return
     end if
 
-    ! allocate a temporary large array (grow if needed)
-    ! We'll read line by line, detect K from header (first line)
-    allocate(tmpdata(maxrows,1))
+    ! 1st pass: read header, count rows
+    rowcount = 0
+    read(unit_in,'(A)', iostat=ios) header
+    if (ios /= 0) then
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=iostat2)
+       if (iostat2 == 0) then
+          write(logu,'(A)') 'ERROR: Empty or missing header in input file.'
+          close(logu)
+       end if
+       close(unit_in)
+       return
+    end if
+
+    if (len_trim(header) == 0) then
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=iostat2)
+       if (iostat2 == 0) then
+          write(logu,'(A)') 'ERROR: Header line empty.'
+          close(logu)
+       end if
+       close(unit_in)
+       return
+    end if
+
+    K = 1
+    do i = 1, len_trim(header)
+       if (header(i:i) == ',') K = K + 1
+    end do
+
     do
        read(unit_in,'(A)', iostat=ios) line
        if (ios /= 0) exit
-       if (firstline) then
-          ! determine number of columns from header line by counting commas
-          ncols = 1
-          do pos = 1, len_trim(line)
-             if (line(pos:pos) == ',') ncols = ncols + 1
-          end do
-          K = ncols
-          ! reallocate tmpdata to have K columns
-          deallocate(tmpdata)
-          allocate(tmpdata(maxrows,K))
-          tmpdata = 0.0
-          firstline = .false.
-          cycle
-       end if
-
-       ! parse numeric values in the line, splitting by comma
-       start = 1
-       do j = 1, K
-          ! find next comma or end
-          comma_pos = index(line(start:), ',')
-          if (comma_pos == 0) then
-             token = adjustl(line(start:))
-          else
-             token = adjustl(line(start:start+comma_pos-2))
-          end if
-
-          ! trim spaces
-          token = trim(token)
-          if (len_trim(token) == 0) then
-             ! missing value -> log and set NaN (we will treat as missing by skipping later)
-             open(unit=99, file=elog, status='old', action='write', position='append', iostat=rstat)
-             if (rstat == 0) then
-                write(99,'(A)') 'WARNING: Empty value at row '//trim(adjustl(itoa(rowcount+1)))//', col '//trim(adjustl(itoa(j)))
-                close(99)
-             end if
-             val = -huge(1.0)  ! sentinel for missing
-          else
-             ! try to read real
-             read(token, *, iostat=rstat) val
-             if (rstat /= 0) then
-                ! non-numeric
-                open(unit=99, file=elog, status='old', action='write', position='append', iostat=rstat)
-                if (rstat == 0) then
-                   write(99,'(A)') 'ERROR: Non-numeric at row '//trim(adjustl(itoa(rowcount+1)))//', col '//trim(adjustl(itoa(j)))//' token="'//trim(token)//'"'
-                   close(99)
-                end if
-                val = -huge(1.0)
-             end if
-          end if
-
-          tmpdata(rowcount+1, j) = val
-
-          if (comma_pos == 0) exit
-          start = start + comma_pos
-       end do
-       rowcount = rowcount + 1
-       if (rowcount >= maxrows) exit
+       ! ignore completely blank lines
+       if (len_trim(line) > 0) rowcount = rowcount + 1
     end do
-
     close(unit_in)
 
     if (rowcount == 0) then
-       open(unit=99, file=elog, status='old', action='write', position='append', iostat=rstat)
-       if (rstat == 0) then
-          write(99, '(A)') 'ERROR: No data rows found in input file.'
-          close(99)
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=iostat2)
+       if (iostat2 == 0) then
+          write(logu,'(A)') 'ERROR: No data rows found in input file.'
+          close(logu)
        end if
-       ! leave data unallocated to signal error
-       deallocate(tmpdata)
        return
     end if
 
-    ! allocate exact sized data and copy (replacing sentinel -huge with NaN marker -huge)
     M = rowcount
     allocate(data(M, K))
-    do i = 1, M
+    data = missing_sentinel
+
+    ! 2nd pass: parse rows safely
+    open(newunit=unit_in, file=filename, status='old', action='read', iostat=ios)
+    if (ios /= 0) then
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=iostat2)
+       if (iostat2 == 0) then
+          write(logu,'(A)') 'ERROR: Could not reopen file for parsing.'
+          close(logu)
+       end if
+       return
+    end if
+
+    ! skip header
+    read(unit_in,'(A)', iostat=ios) line
+    if (ios /= 0) then
+       close(unit_in)
+       return
+    end if
+
+
+    rowcount = 0
+    do
+       read(unit_in,'(A)', iostat=ios) line
+       if (ios /= 0) exit
+       if (len_trim(line) == 0) cycle
+       rowcount = rowcount + 1
+       lenline = len_trim(line)
+       start = 1
+
        do j = 1, K
-          data(i,j) = tmpdata(i,j)
+          if (start > lenline) then
+             token = ''
+          else
+             comma_pos = index(line(start:lenline), ',')
+             if (comma_pos == 0) then
+                token = adjustl(line(start:lenline))
+                start = lenline + 1
+             else
+                if (comma_pos == 1) then
+                   token = ''
+                   start = start + 1
+                else
+                   token = adjustl(line(start:start+comma_pos-2))
+                   start = start + comma_pos
+                end if
+             end if
+          end if
+
+          call read_val_safe(trim(token), val, filename, rowcount, j, elog, missing_sentinel)
+          if (rowcount >= 1 .and. rowcount <= M .and. j >= 1 .and. j <= K) then
+             data(rowcount, j) = val
+          else
+             ! shouldn't happen, but log if indices wrong
+             open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=iostat2)
+             if (iostat2 == 0) then
+                write(logu,'(A)') 'ERROR: index out of range while filling data at row '//trim(adjustl(itoa(rowcount)))//' col '//trim(adjustl(itoa(j)))
+                close(logu)
+             end if
+          end if
        end do
     end do
 
-    deallocate(tmpdata)
-  end subroutine read_csv
+    close(unit_in)
+  end subroutine read_csv_two_pass
+
+  subroutine read_val_safe(str, val, filename, row, col, elog, missing_sentinel)
+    implicit none
+    character(len=*), intent(in) :: str
+    real, intent(out) :: val
+    character(len=*), intent(in) :: filename, elog
+    integer, intent(in) :: row, col
+    real, intent(in) :: missing_sentinel
+    integer :: r, logu
+
+    if (len_trim(str) == 0) then
+       val = missing_sentinel
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=r)
+       if (r == 0) then
+          write(logu,'(A)') 'WARNING: Empty value at row '//trim(adjustl(itoa(row)))//', col '//trim(adjustl(itoa(col)))
+          close(logu)
+       end if
+       return
+    end if
+
+    read(str,*,iostat=r) val
+    if (r /= 0) then
+       val = missing_sentinel
+       open(newunit=logu, file=elog, status='old', action='write', position='append', iostat=r)
+       if (r == 0) then
+          write(logu,'(A)') 'ERROR: Non-numeric at row '//trim(adjustl(itoa(row)))//', col '//trim(adjustl(itoa(col)))//' token="'//trim(str)//'"'
+          close(logu)
+       end if
+    end if
+  end subroutine read_val_safe
 
   subroutine compute_stats_array(data, M, K, means, medians, stddevs, outliers)
     implicit none
@@ -188,18 +227,15 @@ contains
     real, intent(out) :: means(:), medians(:), stddevs(:)
     integer, intent(out) :: outliers(:)
 
-    integer :: j, i, count_valid
-    real, allocatable :: col(:), colcopy(:)
-    real :: s, mean, sd, v
-    real, parameter :: missing_sentinel = -huge(1.0)
-    integer :: idx, n
-
-    allocate(col(M))
-    allocate(colcopy(M))
+    integer :: j, i, n
+    real, allocatable :: col(:), tmp(:)
+    real :: s, mean, sd
+    real, parameter :: missing_sentinel = huge(1.0)
 
     do j = 1, K
-       ! collect valid values for column j
+       ! gather valid values
        n = 0
+       allocate(col(M))
        do i = 1, M
           if (data(i,j) /= missing_sentinel) then
              n = n + 1
@@ -212,10 +248,11 @@ contains
           medians(j) = 0.0
           stddevs(j) = 0.0
           outliers(j) = 0
+          deallocate(col)
           cycle
        end if
 
-       ! compute mean
+       ! mean
        s = 0.0
        do i = 1, n
           s = s + col(i)
@@ -223,38 +260,39 @@ contains
        mean = s / real(n)
        means(j) = mean
 
-       ! compute stddev (sample: divide by n-1 if n>1; else 0)
+       ! sample stddev
        if (n > 1) then
           sd = 0.0
           do i = 1, n
              sd = sd + (col(i) - mean)**2
           end do
-          sd = sqrt(sd / real(n-1))
+          sd = sqrt(sd / real(n - 1))
        else
           sd = 0.0
        end if
        stddevs(j) = sd
 
-       ! median: sort copy of col(1:n)
-       colcopy(1:n) = col(1:n)
-       call quicksort(colcopy, 1, n)
+       ! median: sort tmp(1:n)
+       allocate(tmp(n))
+       tmp(1:n) = col(1:n)
+       call quicksort(tmp, 1, n)
        if (mod(n,2) == 1) then
-          medians(j) = colcopy((n+1)/2)
+          medians(j) = tmp((n+1)/2)
        else
-          medians(j) = 0.5*(colcopy(n/2) + colcopy(n/2+1))
+          medians(j) = 0.5 * ( tmp(n/2) + tmp(n/2 + 1) )
        end if
+       deallocate(tmp)
 
-       ! outliers: |(x-mean)/sd| >= 3 ; if sd == 0 -> zero outliers
+       ! outliers
        outliers(j) = 0
        if (sd > 0.0) then
           do i = 1, n
-             if (abs((col(i)-mean)/sd) >= 3.0) outliers(j) = outliers(j) + 1
+             if (abs((col(i) - mean) / sd) >= 3.0) outliers(j) = outliers(j) + 1
           end do
        end if
 
+       deallocate(col)
     end do
-
-    deallocate(col, colcopy)
   end subroutine compute_stats_array
 
   subroutine write_stats_csv(outfile, K, means, medians, stddevs, outliers)
@@ -267,19 +305,21 @@ contains
 
     open(newunit=unit_out, file=outfile, status='replace', action='write', iostat=ios)
     if (ios /= 0) then
-       write(*,*) 'ERROR: Could not open output file: ', outfile
+       write(*,*) 'ERROR: Could not open output file: ', trim(outfile)
        return
     end if
 
     write(unit_out, '(A)') 'variable,mean,median,stddev,outliers'
     do i = 1, K
-       write(unit_out, '(A,I0,A,F8.6,A,F8.6,A,F8.6,A,I0)') 'col', i, ',', means(i), ',', medians(i), ',', stddevs(i), ',', outliers(i)
+       write(unit_out, '(A)') 'col'//trim(adjustl(itoa(i)))//','// &
+            trim(adjustl(to_string(means(i))))//','//trim(adjustl(to_string(medians(i))))//','// &
+            trim(adjustl(to_string(stddevs(i))))//','//trim(adjustl(itoa(outliers(i))))
     end do
 
     close(unit_out)
   end subroutine write_stats_csv
 
-  ! QuickSort for real array (ascending). Uses indices inclusive left,right
+  ! Basic quicksort (in-place)
   recursive subroutine quicksort(a, left, right)
     implicit none
     real, intent(inout) :: a(:)
@@ -287,7 +327,7 @@ contains
     integer :: i, j
     real :: pivot, tmp
     if (left >= right) return
-    pivot = a((left+right)/2)
+    pivot = a((left + right) / 2)
     i = left
     j = right
     do
@@ -308,12 +348,19 @@ contains
     if (i < right) call quicksort(a, i, right)
   end subroutine quicksort
 
-  ! simple integer->string (Fortran no intrinsic itoa)
+  ! helpers ----------------------------------------------------------------
   function itoa(i) result(s)
     implicit none
     integer, intent(in) :: i
     character(len=32) :: s
     write(s,'(I0)') i
   end function itoa
+
+  function to_string(x) result(s)
+    implicit none
+    real, intent(in) :: x
+    character(len=32) :: s
+    write(s,'(F10.6)') x
+  end function to_string
 
 end program compute_stats
