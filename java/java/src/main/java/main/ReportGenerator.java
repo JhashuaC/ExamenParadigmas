@@ -4,6 +4,9 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.List;
 
+import metricas.MetricaColumna;
+import reglas.ReglaCalidad;
+
 /**
  * Clase encargada de generar los reportes de salida
  * a partir de las métricas estadísticas y las reglas

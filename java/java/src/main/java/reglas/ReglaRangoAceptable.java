@@ -1,4 +1,6 @@
-package main;
+package reglas;
+
+import metricas.MetricaColumna;
 
 /**
  * Implementación de {@link ReglaCalidad} que valida

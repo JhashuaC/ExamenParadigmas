@@ -1,8 +1,11 @@
-package main;
+package readers;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
+
+import metricas.MetricaColumna;
+import metricas.MetricaNormal;
 
 /**
  * Clase encargada de leer el archivo CSV generado por el programa en Fortran

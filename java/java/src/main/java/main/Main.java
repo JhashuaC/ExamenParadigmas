@@ -2,6 +2,11 @@
 package main;
 import java.util.*;
 
+import metricas.MetricaColumna;
+import readers.CSVReader;
+import readers.JSONRulesReader;
+import reglas.ReglaCalidad;
+
 public class Main {
     public static void main(String[] args) {
         // 1. Leer métricas desde stats.csv

@@ -1,4 +1,6 @@
-package main;
+package metricas;
+
+import reglas.ReglaCalidad;
 
 /**
  * Clase abstracta que modela las métricas básicas de una columna

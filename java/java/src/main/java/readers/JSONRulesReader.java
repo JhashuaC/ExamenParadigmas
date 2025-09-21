@@ -1,4 +1,4 @@
-package main;
+package readers;
 
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -8,6 +8,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
+import reglas.ReglaCalidad;
+import reglas.ReglaRangoAceptable;
+import reglas.ReglaSinOutliers;
 
 /**
  * Clase encargada de leer un archivo JSON de reglas de calidad

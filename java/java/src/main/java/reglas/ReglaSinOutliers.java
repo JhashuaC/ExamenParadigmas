@@ -1,7 +1,7 @@
-package main;
+package reglas;
 // Verifica que no haya outliers
 
-
+import metricas.MetricaColumna;
 
 public class ReglaSinOutliers implements ReglaCalidad {
 

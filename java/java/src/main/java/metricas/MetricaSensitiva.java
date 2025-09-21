@@ -1,4 +1,6 @@
-package main;
+package metricas;
+
+import reglas.ReglaCalidad;
 
 /**
  * Subclase concreta de {@link MetricaColumna} que representa
