@@ -1,0 +1,6 @@
+{
+  "reglas": [
+    { "tipo": "RangoAceptable", "min": 5, "max": 15 },
+    { "tipo": "SinOutliers" }
+  ]
+}
