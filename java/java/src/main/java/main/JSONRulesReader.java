@@ -1,10 +1,39 @@
 package main;
-import com.google.gson.*;
-import java.io.*;
-import java.util.*;
 
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+/**
+ * Clase encargada de leer un archivo JSON de reglas de calidad
+ * y convertirlo en una lista de objetos que implementan {@link ReglaCalidad}.
+ *
+ * El archivo JSON debe tener la siguiente estructura:
+ *
+ * {
+ *   "reglas": [
+ *     { "tipo": "RangoAceptable", "min": 10, "max": 60 },
+ *     { "tipo": "SinOutliers" }
+ *   ]
+ * }
+ *
+ * Soporta actualmente dos tipos de reglas:
+ * - {@link ReglaRangoAceptable}: valida que la media esté en un rango definido.
+ * - {@link ReglaSinOutliers}: valida que no existan outliers.
+ */
 public class JSONRulesReader {
 
+    /**
+     * Lee un archivo JSON y devuelve una lista de reglas de calidad.
+     *
+     * @param ruta Ruta del archivo JSON a leer (por ejemplo "in/rules.json").
+     * @return Lista de objetos {@link ReglaCalidad} construidos a partir del JSON.
+     */
     public static List<ReglaCalidad> leerReglas(String ruta) {
         List<ReglaCalidad> reglas = new ArrayList<>();
         try {
