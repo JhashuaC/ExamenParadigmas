@@ -45,7 +45,6 @@ program compute_stats
 
 contains
 
-  ! ---------------------------------------------------------
   ! Subrutina para leer archivo CSV en dos pasadas
   ! ---------------------------------------------------------
   subroutine leer_csv(nombre, datos, M, K, logname)
@@ -132,7 +131,6 @@ contains
     close(u)
   end subroutine leer_csv
 
-  ! ---------------------------------------------------------
   ! Leer un valor de texto, convertir a número y manejar errores
   ! ---------------------------------------------------------
   subroutine leer_valor(str, val, logname, fila, col, sentinel)
@@ -160,7 +158,6 @@ contains
     end if
   end subroutine leer_valor
 
-  ! ---------------------------------------------------------
   ! Calcular estadísticas por columna
   ! ---------------------------------------------------------
   subroutine calcular_estadisticas(datos, M, K, medias, medianas, desvios, outliers)
@@ -228,7 +225,6 @@ contains
     end do
   end subroutine calcular_estadisticas
 
-  ! ---------------------------------------------------------
   ! Guardar resultados en archivo CSV
   ! ---------------------------------------------------------
   subroutine escribir_resultados(nombre, K, medias, medianas, desvios, outliers)
@@ -248,7 +244,6 @@ contains
     close(u)
   end subroutine escribir_resultados
 
-  ! ---------------------------------------------------------
   ! Quicksort simple para ordenar
   ! ---------------------------------------------------------
   recursive subroutine quicksort(a, left, right)
