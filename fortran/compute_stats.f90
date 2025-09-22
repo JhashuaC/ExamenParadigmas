@@ -24,7 +24,7 @@ program compute_stats
   call leer_csv(archivo_entrada, tabla, filas, cols, archivo_log)
 
   if (.not. allocated(tabla)) then
-     write(*,*) 'No se pudieron cargar datos, revise el log.'
+     write(*,*) 'No se pudieron cargar datos, revise el log por favooooor.'
      stop 1
   end if
 
