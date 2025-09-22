@@ -1,12 +1,3 @@
-! ================================================
-! Programa: compute_stats.f90
-!   Lee un archivo CSV con datos numéricos,
-!   calcula estadísticas por columna
-!   (media, mediana, desviación estándar, outliers)
-!   y guarda resultados en stats.csv
-!   además registra errores en errors.log
-! ================================================
-
 program compute_stats
   implicit none
 
@@ -14,13 +5,9 @@ program compute_stats
   character(len=256) :: archivo_salida  = 'stats.csv'
   character(len=256) :: archivo_log     = 'errors.log'
 
-  ! dimensiones
   integer :: filas, cols, ios
 
-  ! matriz con datos
   real, allocatable :: tabla(:,:)
-
-  ! resultados
   real, allocatable :: medias(:), medianas(:), desvios(:)
   integer, allocatable :: num_outliers(:)
 
@@ -34,7 +21,6 @@ program compute_stats
   write(ios,'(A)') '---------------------------------'
   close(ios)
 
-  ! leer datos desde CSV
   call leer_csv(archivo_entrada, tabla, filas, cols, archivo_log)
 
   if (.not. allocated(tabla)) then
@@ -45,10 +31,7 @@ program compute_stats
   ! reservar memoria para resultados
   allocate(medias(cols), medianas(cols), desvios(cols), num_outliers(cols))
 
-  ! calcular estadísticas
   call calcular_estadisticas(tabla, filas, cols, medias, medianas, desvios, num_outliers)
-
-  ! guardar resultados en CSV
   call escribir_resultados(archivo_salida, cols, medias, medianas, desvios, num_outliers)
 
   ! liberar memoria
