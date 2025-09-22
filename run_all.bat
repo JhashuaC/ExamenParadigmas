@@ -22,7 +22,7 @@ echo ===================================
 cd java\java
 
 :: Ejecutar la clase principal de Java con Maven
-mvn exec:java -Dexec.mainClass="main.Main" -Dexec.args="..\..\fortran\stats.csv ..\..\fortran\rules.json"
+mvn exec:java -Dexec.mainClass="main.Main" -Dexec.args="fortran\out\stats.csv java\java\in\rules.json"
 
 cd ..\..
 
